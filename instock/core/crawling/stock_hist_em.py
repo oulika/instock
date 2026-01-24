@@ -742,7 +742,7 @@ def stock_zh_a_hist_from_db(
         # 构建SQL查询
         sql = """
         SELECT 
-            DATE_FORMAT(date, '%Y-%m-%d') as `日期`,
+            date as `日期`,
             CAST(opening_price AS DECIMAL(20,3)) as `开盘`,
             CAST(closing_price AS DECIMAL(20,3)) as `收盘`,
             CAST(highest_price AS DECIMAL(20,3)) as `最高`,
@@ -777,7 +777,7 @@ def stock_zh_a_hist_from_db(
                 # 构建带市场前缀的查询
                 sql_with_market = """
                 SELECT 
-                    DATE_FORMAT(date, '%Y-%m-%d') as `日期`,
+                    date as `日期`,
                     CAST(opening_price AS DECIMAL(20,3)) as `开盘`,
                     CAST(closing_price AS DECIMAL(20,3)) as `收盘`,
                     CAST(highest_price AS DECIMAL(20,3)) as `最高`,

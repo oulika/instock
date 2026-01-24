@@ -358,7 +358,7 @@ def fetch_stock_hist(data_base, date_start=None, is_cache=True):
             data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
             data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
             data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
-            # data["date"] = data['date'].apply(datetime.datetime.strptime, "%Y-%m-%d")
+            # data["date"] = date['date'].dt.strftime('%Y-%m-%d')
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_stock_hist处理异常：{e}")

@@ -3,6 +3,8 @@
 
 from datetime import datetime
 from instock.core.strategy import turtle_trade
+import pandas as pd
+import numpy as np
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -29,6 +31,8 @@ def check(code_name, data, date=None, threshold=15):
     limitup_row = [1000000, '']
     # 找出涨停日
     for _close, _p_change, _date in zip(data['close'].values, data['p_change'].values, data['date'].values):
+        _date = str(np.datetime_as_string(_date, unit='D'))
+
         if _p_change > 9.5:
             if turtle_trade.check_enter(code_name, origin_data, date=datetime.date(datetime.strptime(_date, '%Y-%m-%d')), threshold=threshold):
                 limitup_row[0] = _close

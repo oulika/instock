@@ -5,6 +5,7 @@ from datetime import datetime
 import numpy as np
 import talib as tl
 from instock.core.strategy import enter
+import pandas as pd
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -33,6 +34,8 @@ def check(code_name, data, date=None, threshold=60):
 
     breakthrough_row = None
     for _close, _open, _date, _ma60 in zip(data['close'].values, data['open'].values, data['date'].values, data['ma60'].values):
+        _date = str(np.datetime_as_string(_date, unit='D'))
+
         if _open < _ma60 <= _close:
             if enter.check_volume(code_name, origin_data, date=datetime.date(datetime.strptime(_date, '%Y-%m-%d')), threshold=threshold):
                 breakthrough_row = _date
