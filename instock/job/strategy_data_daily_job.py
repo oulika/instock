@@ -27,6 +27,7 @@ def prepare(date, strategy):
             return
         table_name = strategy['name']
         strategy_func = strategy['func']
+        logging.info(f"开始执行strategy_func={strategy_func}")
         results = run_check(strategy_func, table_name, stocks_data, date)
         if results is None:
             return

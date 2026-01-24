@@ -358,6 +358,7 @@ def fetch_stock_hist(data_base, date_start=None, is_cache=True):
             data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
             data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
             data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
+            # data["date"] = data['date'].apply(datetime.datetime.strptime, "%Y-%m-%d")
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_stock_hist处理异常：{e}")
@@ -380,10 +381,10 @@ def stock_hist_cache(code, date_start, date_end=None, is_cache=True, adjust=''):
             return pd.read_pickle(cache_file, compression="gzip")
         else:
             if date_end is not None:
-                stock = she.stock_zh_a_hist(symbol=code, period="daily", start_date=date_start, end_date=date_end,
+                stock = she.stock_zh_a_hist_from_db(symbol=code, period="daily", start_date=date_start, end_date=date_end,
                                             adjust=adjust)
             else:
-                stock = she.stock_zh_a_hist(symbol=code, period="daily", start_date=date_start, adjust=adjust)
+                stock = she.stock_zh_a_hist_from_db(symbol=code, period="daily", start_date=date_start, adjust=adjust)
 
             if stock is None or len(stock.index) == 0:
                 return None

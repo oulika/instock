@@ -28,3 +28,8 @@ def main():
 # main函数入口
 if __name__ == '__main__':
     main()
+    #
+    # from easytrader.utils.stock import get_today_ipo_data
+    #
+    # ipo_data = get_today_ipo_data()
+    # print(ipo_data)
