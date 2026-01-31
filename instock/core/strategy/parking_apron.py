@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
-
+import logging
 from datetime import datetime
 from instock.core.strategy import turtle_trade
 import pandas as pd
@@ -56,6 +56,9 @@ def check_internal(data, limitup_row):
         return False
 
     for _close, _p_change, _open in zip(consolidation_day23['close'].values, consolidation_day23['p_change'].values, consolidation_day23['open'].values):
+        if _open == 0:
+            logging.warn("_open =0")
+            continue
         if not (0.97 < (_close / _open) < 1.03 and -5 < _p_change < 5
                 and _close > limitup_price and _open > limitup_price):
             return False
