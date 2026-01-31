@@ -6,6 +6,7 @@ import concurrent.futures
 import instock.core.stockfetch as stf
 import instock.core.tablestructure as tbs
 import instock.lib.trade_time as trd
+from instock.core.crawling.stock_hist_em import stock_zh_a_hist_from_db, stock_zh_a_hist_from_db_all
 from instock.lib.singleton_type import singleton_type
 
 __author__ = 'myh '
@@ -16,7 +17,8 @@ __date__ = '2023/3/10 '
 class stock_data(metaclass=singleton_type):
     def __init__(self, date):
         try:
-            self.data = stf.fetch_stocks(date)
+            # self.data = stf.fetch_stocks(date)
+            self.data = stock_zh_a_hist_from_db_all(start_date='20260130', end_date='20260130')
         except Exception as e:
             logging.error(f"singleton.stock_data处理异常：{e}")
 
@@ -33,7 +35,7 @@ class stock_hist_data(metaclass=singleton_type):
         if stocks is None:
             self.data = None
             return
-        date_start, is_cache = trd.get_trade_hist_interval(stocks[0][0])  # 提高运行效率，只运行一次
+        date_start, is_cache = trd.get_trade_hist_interval(stocks[0][0].strftime('%Y-%m-%d'))  # 提高运行效率，只运行一次
         _data = {}
         try:
             # max_workers是None还是没有给出，将默认为机器cup个数*5

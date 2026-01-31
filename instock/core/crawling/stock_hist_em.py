@@ -863,6 +863,156 @@ def stock_zh_a_hist_from_db(
         return pd.DataFrame()
 
 
+def stock_zh_a_hist_from_db_all(
+        symbol: str = "000001",
+        period: str = "daily",
+        start_date: str = "19700101",
+        end_date: str = "20500101",
+        adjust: str = "",
+        db_url: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    从数据库读取沪深京 A 股历史行情数据
+    支持多种股票代码格式:
+    - '000001' (自动判断市场)
+    - 'sh000001' (上证指数)
+    - 'sz000001' (深证指数)
+    - '600000' (浦发银行)
+    - 'sh600000' (浦发银行，上海)
+    - '000002' (万科A)
+    - 'sz000002' (万科A，深圳)
+
+    :param symbol: 股票代码
+    :param period: 时间周期，暂时只支持'daily'，因为数据库存储的是日线数据
+    :param start_date: 开始日期，格式: YYYYMMDD
+    :param end_date: 结束日期，格式: YYYYMMDD
+    :param adjust: 复权类型，数据库存储的是不复权数据，此参数仅保持接口兼容性
+    :param db_url: 数据库连接URL，如果为None则使用默认配置
+    :return: 每日行情DataFrame
+    """
+
+    # 暂时只支持日线数据，因为数据库表设计为日线
+    if period != "daily":
+        logger.warning(f"数据库版本暂时只支持日线数据(daily)，您选择了: {period}")
+        return pd.DataFrame()
+
+    # 如果提供了复权参数，给出警告（数据库存储的是不复权数据）
+    if adjust != "":
+        logger.warning("数据库存储的是不复权原始数据，adjust参数将被忽略")
+
+    # 设置默认数据库连接
+    if db_url is None:
+        db_url = "mysql+pymysql://root:wang521wei@192.168.31.192:3306/stock_master"
+
+    try:
+        # 解析股票代码
+        market_prefix, clean_symbol = parse_symbol(symbol)
+        logger.info(f"解析股票代码: '{symbol}' -> 市场: '{market_prefix}', 代码: '{clean_symbol}'")
+
+        # 转换日期格式
+        start_date_formatted = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
+        end_date_formatted = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+
+        # 获取数据库连接并执行查询
+        engine = get_db_connection(db_url)
+
+        with engine.connect() as conn:
+            # 执行查询
+
+            # 如果查询结果为空，尝试带市场前缀的查询
+            logger.info(f"使用代码 '{clean_symbol}' 未找到数据，尝试带市场前缀查询")
+
+            # 构建带市场前缀的查询
+            sql_with_market = """
+            SELECT 
+            di.date,
+                si.code,
+                si.name,
+                di.date as `日期`,
+                si.code as '代码',
+                si.name as '名称',
+                CAST(di.opening_price AS DECIMAL(20,3)) as `开盘`,
+                CAST(di.closing_price AS DECIMAL(20,3)) as `收盘`,
+                CAST(di.highest_price AS DECIMAL(20,3)) as `最高`,
+                CAST(di.lowest_price AS DECIMAL(20,3)) as `最低`,
+                CAST(di.trading_volume AS UNSIGNED) as `成交量`,
+                CAST(di.trading_value AS DECIMAL(20,2)) as `成交额`,
+                CAST(di.rurnover_rate AS DECIMAL(20,2)) as `换手率`,
+                CAST(di.pre_closing_price AS DECIMAL(20,3)) as `前收盘价`
+            FROM daily_index di ,stock_info si
+            WHERE concat(si.exchange,si.code) = di.code and date BETWEEN :start_date AND :end_date
+            ORDER BY date ASC
+            """
+
+            result = conn.execute(
+                text(sql_with_market),
+                {
+                    "start_date": start_date_formatted,
+                    "end_date": end_date_formatted
+                }
+            )
+
+            temp_df = pd.DataFrame(result.fetchall(), columns=result.keys())
+
+            # 如果查询结果为空，返回空DataFrame
+            if temp_df.empty:
+                logger.info(f"未找到股票 {symbol} 在 {start_date} 到 {end_date} 之间的数据")
+                return pd.DataFrame()
+
+            # 确保所有数值列都是正确的类型
+            numeric_columns = ["开盘", "收盘", "最高", "最低", "成交量", "成交额",
+                               "换手率", "前收盘价"]
+
+            for col in numeric_columns:
+                if col in temp_df.columns:
+                    temp_df[col] = convert_to_numeric(temp_df[col])
+
+            # 计算涨跌幅和涨跌额（基于前收盘价）
+            # 安全计算，避免除零错误
+            temp_df["涨跌幅"] = np.where(
+                temp_df["前收盘价"] != 0,
+                ((temp_df["收盘"] - temp_df["前收盘价"]) / temp_df["前收盘价"] * 100).round(4),
+                0
+            )
+
+            temp_df["涨跌额"] = (temp_df["收盘"] - temp_df["前收盘价"]).round(4)
+
+            # 计算振幅（基于前收盘价）
+            temp_df["振幅"] = np.where(
+                temp_df["前收盘价"] != 0,
+                ((temp_df["最高"] - temp_df["最低"]) / temp_df["前收盘价"] * 100).round(4),
+                0
+            )
+
+            # 设置索引
+            temp_df["日期"] = pd.to_datetime(temp_df["日期"])
+            temp_df.index = temp_df["日期"]
+            temp_df.reset_index(inplace=True, drop=True)
+
+            # 重新排列列顺序，与原始接口保持一致
+            temp_df = temp_df[[
+                "日期", "开盘", "收盘", "最高", "最低",
+                "成交量", "成交额", "振幅", "涨跌幅", "涨跌额", "换手率","代码","名称","code","name","date"
+            ]]
+
+            # 最后再次确保数据类型正确
+            for col in ["开盘", "收盘", "最高", "最低", "成交量", "成交额",
+                        "振幅", "涨跌幅", "涨跌额", "换手率"]:
+                if col in temp_df.columns:
+                    temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce')
+
+            # 替换可能的NaN值
+            temp_df = temp_df.fillna(0)
+
+            logger.info(f"成功从数据库读取股票 {symbol} 的 {len(temp_df)} 条记录")
+
+            return temp_df
+
+    except Exception as e:
+        logger.error(f"从数据库读取数据失败: {e}", exc_info=True)
+        return pd.DataFrame()
+
+
 # 专门处理指数的函数
 def stock_index_hist_from_db(
         symbol: str = "sh000001",
